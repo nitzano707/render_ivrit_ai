@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import os
 from pydub import AudioSegment
 import json
+import requests  # הוספת ייבוא של requests
 
 app = Flask(__name__)
 
