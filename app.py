@@ -12,10 +12,15 @@ HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"}
 
 def transcribe_with_hf(file_path):
     """
-    שליחת קובץ אודיו ל-Hugging Face Inference API.
+    שליחת קובץ אודיו ל-Hugging Face Inference API עם חותמות זמן.
     """
     with open(file_path, "rb") as f:
-        response = requests.post(API_URL, headers=HEADERS, data=f)
+        response = requests.post(
+            API_URL,
+            headers=HEADERS,
+            data=f,
+            params={"return_timestamps": "true"}  # בקשה להחזיר חותמות זמן
+        )
     if response.status_code == 200:
         return response.json()
     else:
@@ -37,7 +42,7 @@ def split_audio(file_path, segment_length=30000):
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     """
-    נקודת קצה API להעלאת קובץ אודיו וקבלת תמלול.
+    נקודת קצה API להעלאת קובץ אודיו וקבלת תמלול עם חותמות זמן.
     """
     if 'file' not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -52,16 +57,23 @@ def transcribe():
 
     # תמלול כל המקטעים
     full_transcription = []
+    timestamps = []
     for segment_path in segments:
         result = transcribe_with_hf(segment_path)
-        if "text" in result:
-            full_transcription.append(result["text"])
+        if "segments" in result:
+            for segment in result["segments"]:
+                full_transcription.append(segment["text"])
+                timestamps.append({
+                    "start": segment["start"],
+                    "end": segment["end"],
+                    "text": segment["text"]
+                })
         os.remove(segment_path)  # מחיקת המקטע
 
     # מחיקת הקובץ המקורי
     os.remove(file_path)
 
-    return jsonify({"transcription": " ".join(full_transcription)})
+    return jsonify({"transcription": " ".join(full_transcription), "timestamps": timestamps}, ensure_ascii=False)
 
 if __name__ == "__main__":
     # הפעלת היישום
